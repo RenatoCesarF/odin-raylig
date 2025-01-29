@@ -6,7 +6,8 @@ import rnd "core:math/rand"
 import rl "vendor:raylib"
 
 import vfx "/vfx/"
-import entity "entities"
+import collider "collider"
+import entity "entity"
 
 SCREEN_WITH :: 800
 SCREEN_HEIGHT :: 450
@@ -21,21 +22,29 @@ main :: proc() {
 	rl.SetWindowPosition(200, 200)
 	rl.SetWindowState({.WINDOW_RESIZABLE})
 
-
 	partSystem := vfx.ParticleSystem {
 		particles = {},
 	}
 
+	collisionSystem := collider.CollisionSystem {
+		colliders = {},
+	}
+
+	collider.create(&collisionSystem, 10, 40, collider.RecShape{10, 30})
+	collider.create(&collisionSystem, 20, 40, collider.RecShape{10, 30})
+
+	g_texture := rl.LoadTexture("./assets/goblin.png")
+	defer rl.UnloadTexture(g_texture)
+
 	//----- Player
-	text := rl.LoadTexture("./assets/image.png")
-	defer rl.UnloadTexture(text)
+	p_texture := rl.LoadTexture("./assets/image.png")
+	defer rl.UnloadTexture(p_texture)
 
 	player := entity.Player {
-		texture  = text,
-		width    = f32(text.width),
-		height   = f32(text.height),
-		x        = 100,
-		y        = 50,
+		texture  = p_texture,
+		width    = f32(p_texture.width),
+		height   = f32(p_texture.height),
+		position = {40, 60},
 		rotation = 0,
 	}
 
@@ -82,48 +91,42 @@ main :: proc() {
 			// screenSpaceCamera.target.y *= VIRTUAL_RATIO
 		}
 		//------- Events
-		if (rl.IsKeyDown(rl.KeyboardKey.D)) {
-			player.x += 30 * rl.GetFrameTime()
-		}
-		if (rl.IsKeyDown(rl.KeyboardKey.A)) {
-			player.x -= 30 * rl.GetFrameTime()
-		}
+		{
+			if (rl.IsKeyDown(rl.KeyboardKey.D)) {
+				player.position.x += 30 * rl.GetFrameTime()
+			}
+			if (rl.IsKeyDown(rl.KeyboardKey.A)) {
+				player.position.x -= 30 * rl.GetFrameTime()
+			}
 
-		if (rl.IsKeyDown(rl.KeyboardKey.S)) {
-			player.y += 30 * rl.GetFrameTime()
-		}
-		if (rl.IsKeyDown(rl.KeyboardKey.W)) {
-			player.y -= 30 * rl.GetFrameTime()
-		}
-
-		if (rl.IsKeyDown(rl.KeyboardKey.G)) {
-			vfx.emit(
-				&partSystem,
-				vfx.ParticleProps {
-					position = {player.x, player.y + player.height - 2},
-					velocity = {-1, -1},
-					colorBegin = rl.BROWN,
-					colorEnd = {255, 255, 255, 0},
-					lifeTime = 2,
-					velocityVariation = {5, 2},
-				},
-			)
+			if (rl.IsKeyDown(rl.KeyboardKey.S)) {
+				player.position.y += 30 * rl.GetFrameTime()
+			}
+			if (rl.IsKeyDown(rl.KeyboardKey.W)) {
+				player.position.y -= 30 * rl.GetFrameTime()
+				collider.create(&collisionSystem, 40, 32, collider.RecShape{10, 30})
+			}
 
 		}
-
 
 		//------- Update
 		{
 			vfx.update(&partSystem)
 			entity.update(&player)
+			collider.checkCollisions(&collisionSystem)
+
+			collider.update(
+				&collisionSystem.colliders[0],
+				f32(rl.GetMouseX() / 5),
+				f32(rl.GetMouseY() / 5),
+			)
 
 			// -- foot particles
 			if entity.is_moving(&player) {
-				// for i in 0 ..< 4 {
 				vfx.emit(
 					&partSystem,
 					vfx.ParticleProps {
-						position = {player.x, player.y + player.height - 1},
+						position = {player.position.x, player.position.y + player.height - 1},
 						positionVariation = {10, 0},
 						velocity = {-4, -4},
 						colorBegin = {200, 200, 200, 255},
@@ -132,7 +135,6 @@ main :: proc() {
 						velocityVariation = {8, 3},
 					},
 				)
-				// }
 			}
 
 			// -- Remove dead particles
@@ -146,6 +148,16 @@ main :: proc() {
 			{
 				vfx.draw(&partSystem)
 				entity.draw(&player)
+				collider.draw(&collisionSystem)
+
+				rl.DrawTexturePro(
+					g_texture,
+					{0.0, 0.0, 8, 8},
+					{10, 20, 16, 16},
+					{8, 8},
+					0,
+					rl.WHITE,
+				)
 
 
 			}
@@ -163,8 +175,8 @@ main :: proc() {
 				// UI STUFF:
 
 				// Blip virtual screen to mainScreen
-
 				// fmt.fmt_cstring(),
+
 				rl.DrawTexturePro(
 					target.texture,
 					virtualSourceRec,
@@ -176,6 +188,7 @@ main :: proc() {
 
 				cstr := fmt.caprintf("rotation %f", player.rotation)
 				rl.DrawText(cstr, 10, 10, 20, rl.BLACK)
+
 
 				rl.DrawText(
 					fmt.caprintf("particle amount: %d", len(partSystem.particles)),

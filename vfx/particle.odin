@@ -15,10 +15,10 @@ ParticleProps :: struct {
 Particle :: struct {
 	position:             rl.Vector2,
 	velocity:             rl.Vector2,
-	colorBegin, colorEnd: rl.Color,
 	// rotation:             f32,
 	// sizeBegin, sizeEnd:   f32,
 	lifeTime, lifeRemain: f32,
+	colorBegin, colorEnd: rl.Color,
 	active:               bool,
 }
 

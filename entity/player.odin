@@ -1,11 +1,10 @@
-package entities
+package entity
 
 import math "core:math"
 import rl "vendor:raylib"
 
 Player :: struct {
-	x:        f32,
-	y:        f32,
+	position: rl.Vector2,
 	texture:  rl.Texture2D,
 	height:   f32,
 	width:    f32,
@@ -36,7 +35,7 @@ draw :: proc(this: ^Player) {
 	rl.DrawTexturePro(
 		this.texture,
 		{0.0, 0.0, this.width, this.height},
-		{this.x, this.y, this.width * 2, this.height * 2},
+		{this.position.x, this.position.y, this.width * 2, this.height * 2},
 		{this.width, this.height},
 		this.rotation,
 		rl.WHITE,
