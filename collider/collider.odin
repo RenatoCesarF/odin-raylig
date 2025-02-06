@@ -4,7 +4,6 @@ import rl "vendor:raylib"
 
 // TODO: Event system? 
 
-
 CollisionSystem :: struct {
 	colliders: [dynamic]Collider,
 }
@@ -43,6 +42,7 @@ update :: proc(this: ^Collider, x, y: f32) {
 
 checkCollisions :: proc(this: ^CollisionSystem) {
 	for &colA in this.colliders {
+		colA.color = rl.RED
 		for &colB in this.colliders {
 			if (&colA == &colB) {
 				continue
@@ -62,7 +62,6 @@ draw :: proc(this: ^CollisionSystem) {
 			rl.DrawRectangleLines(i32(p.x), i32(p.y), i32(s.width), i32(s.height), p.color)
 			break
 		}
-
 	}
 }
 
@@ -88,11 +87,9 @@ checkCollision :: proc(colA, colB: ^Collider) {
 
 			if collidedX && collidedY {
 				colA.color = rl.GREEN
-				break
+				colB.color = rl.GREEN
+				return
 			}
-			colA.color = rl.RED
-
-
 		case CircleShape:
 			break
 		}
@@ -100,6 +97,7 @@ checkCollision :: proc(colA, colB: ^Collider) {
 		break
 	}
 }
+
 randomColor :: proc() -> rl.Color {
 	return rl.RED
 }
