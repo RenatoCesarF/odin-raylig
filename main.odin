@@ -7,20 +7,25 @@ import rl "vendor:raylib"
 
 import vfx "/vfx/"
 import collider "collider"
+import debug "debug"
 import entity "entity"
 
-SCREEN_WITH :: 800
+SCREEN_WIDTH :: 800
 SCREEN_HEIGHT :: 450
 
 VIRTUAL_RATIO :: 5
-VIRTUAL_WITH :: SCREEN_WITH / VIRTUAL_RATIO
+VIRTUAL_WITH :: SCREEN_WIDTH / VIRTUAL_RATIO
 VIRTUAL_HEIGHT :: SCREEN_HEIGHT / VIRTUAL_RATIO
 
 
 main :: proc() {
-	rl.InitWindow(SCREEN_WITH, SCREEN_HEIGHT, "Game")
+	rl.InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Game")
 	rl.SetWindowPosition(200, 200)
 	rl.SetWindowState({.WINDOW_RESIZABLE})
+
+	debugText := debug.DebugText {
+		texts = {},
+	}
 
 	partSystem := vfx.ParticleSystem {
 		particles = {},
@@ -30,8 +35,6 @@ main :: proc() {
 		colliders = {},
 	}
 
-	collider.create(&collisionSystem, 10, 40, collider.RecShape{10, 30})
-	collider.create(&collisionSystem, 20, 40, collider.RecShape{10, 30})
 
 	g_texture := rl.LoadTexture("./assets/goblin.png")
 	defer rl.UnloadTexture(g_texture)
@@ -40,6 +43,13 @@ main :: proc() {
 	p_texture := rl.LoadTexture("./assets/image.png")
 	defer rl.UnloadTexture(p_texture)
 
+	collider.create(
+		&collisionSystem,
+		10,
+		40,
+		// collider.CircleShape{radius = 10},
+		collider.RecShape{10, 30},
+	)
 	player := entity.Player {
 		texture  = p_texture,
 		width    = f32(p_texture.width),
@@ -47,6 +57,13 @@ main :: proc() {
 		position = {40, 60},
 		rotation = 0,
 	}
+	player.collision = collider.create(
+	&collisionSystem,
+	40,
+	60,
+	// collider.CircleShape{radius = 10},
+	collider.RecShape{player.width + 2, player.height + 4},
+	)
 
 
 	// --- Target
@@ -68,7 +85,7 @@ main :: proc() {
 	virtualDestRec: rl.Rectangle =  {
 		-VIRTUAL_RATIO,
 		-VIRTUAL_RATIO,
-		SCREEN_WITH + (VIRTUAL_RATIO * 2),
+		SCREEN_WIDTH + (VIRTUAL_RATIO * 2),
 		SCREEN_HEIGHT + (VIRTUAL_RATIO * 2),
 	}
 
@@ -76,7 +93,6 @@ main :: proc() {
 
 	for !rl.WindowShouldClose() {
 		{
-
 			// cameraX = (math.sin(rl.GetTime()) * 50) - 10
 			// cameraY = math.cos(rl.GetTime()) * 30
 
@@ -104,9 +120,7 @@ main :: proc() {
 			}
 			if (rl.IsKeyDown(rl.KeyboardKey.W)) {
 				player.position.y -= 30 * rl.GetFrameTime()
-				collider.create(&collisionSystem, 40, 32, collider.RecShape{10, 30})
 			}
-
 		}
 
 		//------- Update
@@ -117,12 +131,17 @@ main :: proc() {
 
 			collider.update(
 				&collisionSystem.colliders[0],
-				f32(rl.GetMouseX() / 5),
-				f32(rl.GetMouseY() / 5),
+				f32(rl.GetMouseX() / VIRTUAL_RATIO),
+				f32(rl.GetMouseY() / VIRTUAL_RATIO),
 			)
 
 			// -- foot particles
 			if entity.is_moving(&player) {
+				collider.update(
+					player.collision,
+					player.position.x - player.width / 2,
+					player.position.y - player.height / 2,
+				)
 				vfx.emit(
 					&partSystem,
 					vfx.ParticleProps {
@@ -137,7 +156,6 @@ main :: proc() {
 				)
 			}
 
-			// -- Remove dead particles
 		}
 
 		//------- Draw 
@@ -148,7 +166,7 @@ main :: proc() {
 			{
 				vfx.draw(&partSystem)
 				entity.draw(&player)
-				collider.draw(&collisionSystem)
+				// collider.draw(&collisionSystem)
 
 				rl.DrawTexturePro(
 					g_texture,
@@ -158,7 +176,6 @@ main :: proc() {
 					0,
 					rl.WHITE,
 				)
-
 
 			}
 			rl.EndMode2D()
@@ -175,7 +192,6 @@ main :: proc() {
 				// UI STUFF:
 
 				// Blip virtual screen to mainScreen
-				// fmt.fmt_cstring(),
 
 				rl.DrawTexturePro(
 					target.texture,
@@ -185,6 +201,7 @@ main :: proc() {
 					0,
 					rl.WHITE,
 				)
+				collider.draw(&collisionSystem)
 
 				cstr := fmt.caprintf("rotation %f", player.rotation)
 				rl.DrawText(cstr, 10, 10, 20, rl.BLACK)
@@ -197,6 +214,7 @@ main :: proc() {
 					20,
 					rl.BLACK,
 				)
+
 
 			}
 			rl.EndMode2D()

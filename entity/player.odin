@@ -3,12 +3,15 @@ package entity
 import math "core:math"
 import rl "vendor:raylib"
 
+import collider "../collider"
+
 Player :: struct {
-	position: rl.Vector2,
-	texture:  rl.Texture2D,
-	height:   f32,
-	width:    f32,
-	rotation: f32,
+	position:  rl.Vector2,
+	texture:   rl.Texture2D,
+	collision: ^collider.Collider,
+	height:    f32,
+	width:     f32,
+	rotation:  f32,
 }
 
 update :: proc(this: ^Player) {
