@@ -4,6 +4,8 @@ package collider
 import fmt "core:fmt"
 import rl "vendor:raylib"
 
+import "../config"
+
 // TODO: Event system? 
 
 CollisionSystem :: struct {
@@ -31,12 +33,10 @@ Collider :: struct {
 	enable:     bool,
 }
 
-create :: proc(this: ^CollisionSystem, x, y: f32, shape: Shape) -> ^Collider {
+create :: proc(this: ^CollisionSystem, x, y: f32, shape: Shape) -> int {
 	collider := Collider{{}, x, y, shape, randomColor(), true}
-
 	append(&this.colliders, collider)
-
-	return &this.colliders[len(this.colliders) - 1]
+	return len(this.colliders) - 1
 }
 
 update :: proc(this: ^Collider, x, y: f32) {
@@ -60,14 +60,24 @@ draw :: proc(this: ^CollisionSystem) {
 	for p, index in this.colliders {
 		switch s in p.shape {
 		case CircleShape:
-			rl.DrawCircleLines(i32(p.x) * 5, i32(p.y) * 5, s.radius * 5, p.color * 5)
+			rl.DrawCircleLines(
+				i32(p.x) * config.VIRTUAL_RATIO,
+				i32(p.y) * config.VIRTUAL_RATIO,
+				s.radius * config.VIRTUAL_RATIO,
+				p.color * config.VIRTUAL_RATIO,
+			)
 			break
 		case RecShape:
 			posStr := fmt.caprintf("x %d y %d", i32(p.x), i32(p.y))
 			sizeStr := fmt.caprintf("w %d H %d", i32(s.width), i32(s.height))
 
 			rl.DrawRectangleLinesEx(
-				rl.Rectangle{height = s.height * 5, width = s.width * 5, x = p.x * 5, y = p.y * 5},
+				rl.Rectangle {
+					height = s.height * config.VIRTUAL_RATIO,
+					width = s.width * config.VIRTUAL_RATIO,
+					x = p.x * config.VIRTUAL_RATIO,
+					y = p.y * config.VIRTUAL_RATIO,
+				},
 				2,
 				p.color,
 			)
@@ -75,7 +85,7 @@ draw :: proc(this: ^CollisionSystem) {
 			rl.DrawTextEx(
 				rl.GetFontDefault(),
 				posStr,
-				rl.Vector2{p.x * 5 - 10, p.y * 5 - 10},
+				rl.Vector2{p.x * config.VIRTUAL_RATIO - 10, p.y * config.VIRTUAL_RATIO - 10},
 				18,
 				1,
 				rl.BLACK,
@@ -84,7 +94,10 @@ draw :: proc(this: ^CollisionSystem) {
 			rl.DrawTextEx(
 				rl.GetFontDefault(),
 				sizeStr,
-				rl.Vector2{p.x * 5 - 10, p.y * 5 + s.height * 5},
+				rl.Vector2 {
+					p.x * config.VIRTUAL_RATIO - 10,
+					p.y * config.VIRTUAL_RATIO + s.height * config.VIRTUAL_RATIO,
+				},
 				18,
 				1,
 				rl.BLACK,

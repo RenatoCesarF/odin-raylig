@@ -7,67 +7,63 @@ import rl "vendor:raylib"
 
 import vfx "/vfx/"
 import collider "collider"
+import config "config"
 import debug "debug"
 import entity "entity"
-
-SCREEN_WIDTH :: 800
-SCREEN_HEIGHT :: 450
-
-VIRTUAL_RATIO :: 5
-VIRTUAL_WITH :: SCREEN_WIDTH / VIRTUAL_RATIO
-VIRTUAL_HEIGHT :: SCREEN_HEIGHT / VIRTUAL_RATIO
+import timer "timer"
 
 
 main :: proc() {
-	rl.InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Game")
+	rl.InitWindow(config.SCREEN_WIDTH, config.SCREEN_HEIGHT, "Game")
 	rl.SetWindowPosition(200, 200)
 	rl.SetWindowState({.WINDOW_RESIZABLE})
 
+	debug_mode := true
+
+
+	// --- INIT SYSTEMS --
+	enemies: [dynamic]entity.Entity
+	timers: [dynamic]timer.Timer
 	debugText := debug.DebugText {
 		texts = {},
 	}
-
 	partSystem := vfx.ParticleSystem {
 		particles = {},
 	}
-
 	collisionSystem := collider.CollisionSystem {
 		colliders = {},
 	}
 
+	// --- Instancing --- 
+	enemies_debug_count := debug.create(
+		&debugText,
+		0.0,
+		0.0,
+		10,
+		fmt.ctprintf("Enemies count: %d", len(enemies)),
+	)
 
+	enemy_spaw_timer := timer.create(0.5)
+
+	//----- Enemy
 	g_texture := rl.LoadTexture("./assets/goblin.png")
-	defer rl.UnloadTexture(g_texture)
 
 	//----- Player
+
 	p_texture := rl.LoadTexture("./assets/image.png")
 	defer rl.UnloadTexture(p_texture)
 
-	collider.create(
+	player := entity.create(p_texture, rl.Vector2{0, 0})
+	player.collisionIndex = collider.create(
 		&collisionSystem,
-		10,
-		40,
-		// collider.CircleShape{radius = 10},
-		collider.RecShape{10, 30},
-	)
-	player := entity.Player {
-		texture  = p_texture,
-		width    = f32(p_texture.width),
-		height   = f32(p_texture.height),
-		position = {40, 60},
-		rotation = 0,
-	}
-	player.collision = collider.create(
-	&collisionSystem,
-	40,
-	60,
-	// collider.CircleShape{radius = 10},
-	collider.RecShape{player.width + 2, player.height + 4},
+		player.position.x,
+		player.position.y,
+		collider.RecShape{player.width + 2, player.height + 4},
 	)
 
 
 	// --- Target
-	target: rl.RenderTexture2D = rl.LoadRenderTexture(VIRTUAL_WITH, VIRTUAL_HEIGHT)
+	target: rl.RenderTexture2D = rl.LoadRenderTexture(config.VIRTUAL_WITH, config.VIRTUAL_HEIGHT)
 
 	//------ Camera 
 	worldSpaceCamera: rl.Camera2D = {}
@@ -82,11 +78,11 @@ main :: proc() {
 	rotation: f32 = 0
 
 	virtualSourceRec: rl.Rectangle = {0, 0, f32(target.texture.width), f32(-target.texture.height)}
-	virtualDestRec: rl.Rectangle =  {
-		-VIRTUAL_RATIO,
-		-VIRTUAL_RATIO,
-		SCREEN_WIDTH + (VIRTUAL_RATIO * 2),
-		SCREEN_HEIGHT + (VIRTUAL_RATIO * 2),
+	virtualDestRec: rl.Rectangle = {
+		-config.VIRTUAL_RATIO,
+		-config.VIRTUAL_RATIO,
+		config.SCREEN_WIDTH + (config.VIRTUAL_RATIO * 2),
+		config.SCREEN_HEIGHT + (config.VIRTUAL_RATIO * 2),
 	}
 
 	rl.SetTargetFPS(60)
@@ -108,18 +104,21 @@ main :: proc() {
 		}
 		//------- Events
 		{
+			if rl.IsKeyPressed(rl.KeyboardKey.ZERO) {
+				debug_mode = !debug_mode
+			}
 			if (rl.IsKeyDown(rl.KeyboardKey.D)) {
-				player.position.x += 30 * rl.GetFrameTime()
+				player.aceleration.x += 30 * rl.GetFrameTime()
 			}
 			if (rl.IsKeyDown(rl.KeyboardKey.A)) {
-				player.position.x -= 30 * rl.GetFrameTime()
+				player.aceleration.x -= 30 * rl.GetFrameTime()
 			}
 
 			if (rl.IsKeyDown(rl.KeyboardKey.S)) {
-				player.position.y += 30 * rl.GetFrameTime()
+				player.aceleration.y += 30 * rl.GetFrameTime()
 			}
 			if (rl.IsKeyDown(rl.KeyboardKey.W)) {
-				player.position.y -= 30 * rl.GetFrameTime()
+				player.aceleration.y -= 30 * rl.GetFrameTime()
 			}
 		}
 
@@ -127,21 +126,50 @@ main :: proc() {
 		{
 			vfx.update(&partSystem)
 			entity.update(&player)
+			collider.update(
+				&collisionSystem.colliders[player.collisionIndex],
+				player.position.x - player.width / 2,
+				player.position.y - player.height / 2,
+			)
 			collider.checkCollisions(&collisionSystem)
 
-			collider.update(
-				&collisionSystem.colliders[0],
-				f32(rl.GetMouseX() / VIRTUAL_RATIO),
-				f32(rl.GetMouseY() / VIRTUAL_RATIO),
-			)
+			timer.update(&enemy_spaw_timer, rl.GetFrameTime())
+
+			if (enemy_spaw_timer.ready) {
+				ent := entity.create(g_texture, rl.Vector2{50, 50})
+				ent.collisionIndex = collider.create(
+					&collisionSystem,
+					ent.position.x,
+					ent.position.y,
+					collider.RecShape{ent.width + 2, ent.height + 4},
+				)
+				append(&enemies, ent)
+				timer.start(&enemy_spaw_timer)
+			}
+
+			enemies_debug_count.text = fmt.ctprintf("Enemies count: %d", len(enemies))
+
+			for i in 0 ..< len(enemies) {
+				direction := rl.Vector2 {
+					player.position.x - enemies[i].position.x,
+					player.position.y - enemies[i].position.y,
+				}
+
+				direction = normalize_vector2(direction)
+
+				enemies[i].aceleration.x += direction.x * 10 * rl.GetFrameTime()
+				enemies[i].aceleration.y += direction.y * 10 * rl.GetFrameTime()
+
+				entity.update(&enemies[i])
+				collider.update(
+					&collisionSystem.colliders[enemies[i].collisionIndex],
+					enemies[i].position.x - enemies[i].width / 2,
+					enemies[i].position.y - enemies[i].height / 2,
+				)
+			}
 
 			// -- foot particles
 			if entity.is_moving(&player) {
-				collider.update(
-					player.collision,
-					player.position.x - player.width / 2,
-					player.position.y - player.height / 2,
-				)
 				vfx.emit(
 					&partSystem,
 					vfx.ParticleProps {
@@ -166,17 +194,9 @@ main :: proc() {
 			{
 				vfx.draw(&partSystem)
 				entity.draw(&player)
-				// collider.draw(&collisionSystem)
-
-				rl.DrawTexturePro(
-					g_texture,
-					{0.0, 0.0, 8, 8},
-					{10, 20, 16, 16},
-					{8, 8},
-					0,
-					rl.WHITE,
-				)
-
+				for i in 0 ..< len(enemies) {
+					entity.draw(&enemies[i])
+				}
 			}
 			rl.EndMode2D()
 			rl.EndTextureMode()
@@ -201,21 +221,10 @@ main :: proc() {
 					0,
 					rl.WHITE,
 				)
-				collider.draw(&collisionSystem)
-
-				cstr := fmt.caprintf("rotation %f", player.rotation)
-				rl.DrawText(cstr, 10, 10, 20, rl.BLACK)
-
-
-				rl.DrawText(
-					fmt.caprintf("particle amount: %d", len(partSystem.particles)),
-					10,
-					40,
-					20,
-					rl.BLACK,
-				)
-
-
+				if debug_mode {
+					collider.draw(&collisionSystem)
+					debug.draw(&debugText)
+				}
 			}
 			rl.EndMode2D()
 			rl.EndDrawing()
@@ -225,4 +234,13 @@ main :: proc() {
 	rl.UnloadRenderTexture(target)
 	rl.CloseWindow()
 	return
+}
+
+normalize_vector2 :: proc(v: rl.Vector2) -> rl.Vector2 {
+	lenght := math.sqrt(v.x * v.x + v.y * v.y)
+	if lenght != 0.0 {
+		return rl.Vector2{v.x / lenght, v.y / lenght}
+	}
+
+	return rl.Vector2{0, 0}
 }
