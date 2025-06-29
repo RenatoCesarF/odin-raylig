@@ -1,10 +1,9 @@
 package entity
-
+import "../config"
 import "core:fmt"
 import math "core:math"
 import rl "vendor:raylib"
 
-import collider "../collider"
 
 Entity :: struct {
 	life:           i8,
@@ -12,7 +11,7 @@ Entity :: struct {
 	position:       rl.Vector2,
 	aceleration:    rl.Vector2,
 	texture:        rl.Texture2D,
-	collisionIndex: int, //^collider.Collider,
+	collisionIndex: int,
 	height:         f32,
 	width:          f32,
 	rotation:       f32,
@@ -42,13 +41,7 @@ update :: proc(this: ^Entity) {
 	}
 
 	this.position += this.aceleration
-
-	this.aceleration = this.aceleration * 0.7 // damping, para simular atrito
-
-	// if (this.collision != nil) {
-	// 	this.collision.x = this.position.x - this.width / 2
-	// 	this.collision.y = this.position.y - this.height / 2
-	// }
+	this.aceleration = this.aceleration * 0.7
 }
 
 is_moving :: proc(p: ^Entity) -> bool {

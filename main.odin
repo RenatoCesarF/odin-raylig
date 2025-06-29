@@ -13,6 +13,29 @@ import entity "entity"
 import timer "timer"
 
 
+collisionSystem: collider.CollisionSystem
+
+PushPlayerCallback :: struct {
+	self_index:   int,
+	system:       ^collider.CollisionSystem,
+	on_collision: proc(self: ^PushPlayerCallback, other: ^collider.Collider),
+}
+
+push_player_callback := proc(self_index: int) -> PushPlayerCallback {
+	return PushPlayerCallback {
+		self_index = self_index,
+		system = &collisionSystem,
+		on_collision = proc(self: ^PushPlayerCallback, other: ^collider.Collider) {
+			self_collider := &self.system.colliders[self.self_index]
+			direction :=
+				rl.Vector2{self_collider.x, self_collider.y} - rl.Vector2{other.x, other.y}
+			normalized := rl.Vector2Normalize(direction)
+			self_entity := self_collider.entity_ptr
+			self_entity.aceleration = normalized * 2
+		},
+	}
+}
+
 main :: proc() {
 	rl.InitWindow(config.SCREEN_WIDTH, config.SCREEN_HEIGHT, "Game")
 	rl.SetWindowPosition(200, 200)
@@ -20,47 +43,44 @@ main :: proc() {
 
 	debug_mode := true
 
-
 	// --- INIT SYSTEMS --
 	enemies: [dynamic]entity.Entity
 	timers: [dynamic]timer.Timer
+
 	debugText := debug.DebugText {
 		texts = {},
 	}
 	partSystem := vfx.ParticleSystem {
 		particles = {},
 	}
-	collisionSystem := collider.CollisionSystem {
+	collisionSystem = collider.CollisionSystem {
 		colliders = {},
 	}
 
 	// --- Instancing --- 
-	enemies_debug_count := debug.create(
-		&debugText,
-		0.0,
-		0.0,
-		10,
-		fmt.ctprintf("Enemies count: %d", len(enemies)),
-	)
-
 	enemy_spaw_timer := timer.create(0.5)
+
+	debug_collider := debug.create(&debugText, 0, 0, 20, "")
 
 	//----- Enemy
 	g_texture := rl.LoadTexture("./assets/goblin.png")
 
 	//----- Player
-
 	p_texture := rl.LoadTexture("./assets/image.png")
 	defer rl.UnloadTexture(p_texture)
 
 	player := entity.create(p_texture, rl.Vector2{0, 0})
+
 	player.collisionIndex = collider.create(
 		&collisionSystem,
 		player.position.x,
 		player.position.y,
 		collider.RecShape{player.width + 2, player.height + 4},
-	)
+		entity = &player,
+		on_collision = proc(other: ^collider.Collider) {
 
+		},
+	)
 
 	// --- Target
 	target: rl.RenderTexture2D = rl.LoadRenderTexture(config.VIRTUAL_WITH, config.VIRTUAL_HEIGHT)
@@ -107,6 +127,7 @@ main :: proc() {
 			if rl.IsKeyPressed(rl.KeyboardKey.ZERO) {
 				debug_mode = !debug_mode
 			}
+			// MOVEMENT
 			if (rl.IsKeyDown(rl.KeyboardKey.D)) {
 				player.aceleration.x += 30 * rl.GetFrameTime()
 			}
@@ -131,9 +152,16 @@ main :: proc() {
 				player.position.x - player.width / 2,
 				player.position.y - player.height / 2,
 			)
+
 			collider.checkCollisions(&collisionSystem)
 
 			timer.update(&enemy_spaw_timer, rl.GetFrameTime())
+
+			debug_collider.text = fmt.caprintfln(
+				"Coliders cound:  %d",
+				len(collisionSystem.colliders),
+			)
+
 
 			if (enemy_spaw_timer.ready) {
 				ent := entity.create(g_texture, rl.Vector2{50, 50})
@@ -142,12 +170,11 @@ main :: proc() {
 					ent.position.x,
 					ent.position.y,
 					collider.RecShape{ent.width + 2, ent.height + 4},
+					entity = &ent,
 				)
 				append(&enemies, ent)
 				timer.start(&enemy_spaw_timer)
 			}
-
-			enemies_debug_count.text = fmt.ctprintf("Enemies count: %d", len(enemies))
 
 			for i in 0 ..< len(enemies) {
 				direction := rl.Vector2 {
@@ -221,10 +248,10 @@ main :: proc() {
 					0,
 					rl.WHITE,
 				)
-				if debug_mode {
-					collider.draw(&collisionSystem)
-					debug.draw(&debugText)
-				}
+				// if debug_mode {
+				collider.draw(&collisionSystem)
+				debug.draw(&debugText)
+				// }
 			}
 			rl.EndMode2D()
 			rl.EndDrawing()

@@ -5,8 +5,8 @@ import fmt "core:fmt"
 import rl "vendor:raylib"
 
 import "../config"
+import "../entity"
 
-// TODO: Event system? 
 
 CollisionSystem :: struct {
 	colliders: [dynamic]Collider,
@@ -26,15 +26,32 @@ CircleShape :: struct {
 }
 
 Collider :: struct {
-	collisions: [dynamic]Collider,
-	x, y:       f32,
-	shape:      Shape,
-	color:      rl.Color,
-	enable:     bool,
+	collisions:   [dynamic]Collider,
+	x, y:         f32,
+	shape:        Shape,
+	color:        rl.Color,
+	enable:       bool,
+	on_collision: proc(other: ^Collider),
+	entity_ptr:   ^entity.Entity,
 }
 
-create :: proc(this: ^CollisionSystem, x, y: f32, shape: Shape) -> int {
-	collider := Collider{{}, x, y, shape, randomColor(), true}
+create :: proc(
+	this: ^CollisionSystem,
+	x, y: f32,
+	shape: Shape,
+	entity: ^entity.Entity,
+	on_collision: proc(_: ^Collider) = {},
+) -> int {
+	collider := Collider {
+		collisions   = {},
+		x            = x,
+		y            = y,
+		shape        = shape,
+		color        = randomColor(),
+		enable       = true,
+		entity_ptr   = entity,
+		on_collision = on_collision,
+	}
 	append(&this.colliders, collider)
 	return len(this.colliders) - 1
 }
@@ -104,15 +121,24 @@ draw :: proc(this: ^CollisionSystem) {
 			)
 			break
 		}
+
 	}
 }
 
 checkCollision :: proc(colA, colB: ^Collider) {
 	switch shapeA in colA.shape {
+
 	case RecShape:
 		switch shapeB in colB.shape {
 		case RecShape:
 			if rect_rect_collision_check(colA, colB, shapeA, shapeB) {
+				if colA.on_collision != nil {
+					colA.on_collision(colB)
+				}
+				if colB.on_collision != nil {
+					colB.on_collision(colA)
+				}
+
 				colA.color = rl.GREEN
 				colB.color = rl.GREEN
 				return
@@ -125,13 +151,12 @@ checkCollision :: proc(colA, colB: ^Collider) {
 		case RecShape:
 			break
 		case CircleShape:
-			if (circle_circle_collision_check(colA, colB, shapeA, shapeB)) {
+			if circle_circle_collision_check(colA, colB, shapeA, shapeB) {
 				colA.color = rl.GREEN
 				colB.color = rl.GREEN
 				return
 			}
 			break
-
 		}
 		break
 	}
@@ -149,7 +174,6 @@ circle_circle_collision_check :: proc(colA, colB: ^Collider, shapeA, shapeB: Cir
 
 	return distance_squared <= radius_sum * radius_sum
 }
-
 
 rect_rect_collision_check :: proc(colA, colB: ^Collider, shapeA, shapeB: RecShape) -> bool {
 	leftA := colA.x
