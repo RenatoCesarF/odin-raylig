@@ -6,8 +6,8 @@ import rl "vendor:raylib"
 
 
 Entity :: struct {
-	life:           i8,
-	max_life:       i8,
+	// life:           i8,
+	// max_life:       i8,
 	position:       rl.Vector2,
 	aceleration:    rl.Vector2,
 	texture:        rl.Texture2D,
@@ -19,14 +19,14 @@ Entity :: struct {
 
 create :: proc(texture: rl.Texture2D, position: rl.Vector2) -> Entity {
 	return Entity {
-		texture = texture,
-		width = f32(texture.width),
-		height = f32(texture.height),
-		position = position,
+		texture     = texture,
+		width       = f32(texture.width),
+		height      = f32(texture.height),
+		position    = position,
 		aceleration = {0, 0},
-		rotation = 0,
-		max_life = 10,
-		life = 10,
+		rotation    = 0,
+		// max_life = 10,
+		// life = 10,
 	}
 }
 

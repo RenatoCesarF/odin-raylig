@@ -7,6 +7,7 @@ import rl "vendor:raylib"
 import "../config"
 import "../entity"
 
+OnCollideProc :: proc(ctx: rawptr, other: ^Collider)
 
 CollisionSystem :: struct {
 	colliders: [dynamic]Collider,
@@ -26,13 +27,14 @@ CircleShape :: struct {
 }
 
 Collider :: struct {
-	collisions:   [dynamic]Collider,
-	x, y:         f32,
-	shape:        Shape,
-	color:        rl.Color,
-	enable:       bool,
-	on_collision: proc(other: ^Collider),
-	entity_ptr:   ^entity.Entity,
+	collisions: [dynamic]Collider,
+	x, y:       f32,
+	shape:      Shape,
+	color:      rl.Color,
+	enable:     bool,
+	ctx:        rawptr,
+	on_collide: OnCollideProc,
+	// entity_ptr:   ^entity.Entity,
 }
 
 create :: proc(
@@ -40,17 +42,17 @@ create :: proc(
 	x, y: f32,
 	shape: Shape,
 	entity: ^entity.Entity,
-	on_collision: proc(_: ^Collider) = {},
+	on_collide: proc(ctx: rawptr, other: ^Collider),
 ) -> int {
 	collider := Collider {
-		collisions   = {},
-		x            = x,
-		y            = y,
-		shape        = shape,
-		color        = randomColor(),
-		enable       = true,
-		entity_ptr   = entity,
-		on_collision = on_collision,
+		collisions = {},
+		x          = x,
+		y          = y,
+		shape      = shape,
+		color      = randomColor(),
+		enable     = true,
+		ctx        = entity,
+		on_collide = on_collide,
 	}
 	append(&this.colliders, collider)
 	return len(this.colliders) - 1
@@ -62,13 +64,20 @@ update :: proc(this: ^Collider, x, y: f32) {
 }
 
 checkCollisions :: proc(this: ^CollisionSystem) {
-	for &colA in this.colliders {
-		colA.color = rl.RED
-		for &colB in this.colliders {
-			if (&colA == &colB) {
+	for i in 0 ..< len(this.colliders) {
+		this.colliders[i].color = rl.RED
+		for j in 0 ..< len(this.colliders) {
+			if i == j {
 				continue
 			}
-			checkCollision(&colA, &colB)
+			if checkCollided(&this.colliders[i], &this.colliders[j]) {
+				if this.colliders[i].on_collide != nil {
+					this.colliders[i].on_collide(this.colliders[i].ctx, &this.colliders[j])
+				}
+				if this.colliders[j].on_collide != nil {
+					this.colliders[j].on_collide(this.colliders[j].ctx, &this.colliders[i])
+				}
+			}
 		}
 	}
 }
@@ -125,23 +134,14 @@ draw :: proc(this: ^CollisionSystem) {
 	}
 }
 
-checkCollision :: proc(colA, colB: ^Collider) {
+checkCollided :: proc(colA, colB: ^Collider) -> bool {
 	switch shapeA in colA.shape {
 
 	case RecShape:
 		switch shapeB in colB.shape {
 		case RecShape:
 			if rect_rect_collision_check(colA, colB, shapeA, shapeB) {
-				if colA.on_collision != nil {
-					colA.on_collision(colB)
-				}
-				if colB.on_collision != nil {
-					colB.on_collision(colA)
-				}
-
-				colA.color = rl.GREEN
-				colB.color = rl.GREEN
-				return
+				return true
 			}
 		case CircleShape:
 			break
@@ -151,15 +151,10 @@ checkCollision :: proc(colA, colB: ^Collider) {
 		case RecShape:
 			break
 		case CircleShape:
-			if circle_circle_collision_check(colA, colB, shapeA, shapeB) {
-				colA.color = rl.GREEN
-				colB.color = rl.GREEN
-				return
-			}
-			break
-		}
+			return circle_circle_collision_check(colA, colB, shapeA, shapeB)}
 		break
 	}
+	return false
 }
 
 randomColor :: proc() -> rl.Color {
